@@ -1,0 +1,454 @@
+import streamlit as st
+import sys
+import os
+import plotly.graph_objects as go
+import pandas as pd
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from agents.agent1_extractor import run as run1
+from agents.agent2_graph import run as run2
+from agents.agent3_rag import run as run3
+from agents.agent4_ranker import run as run4
+from agents.agent5_rationale import run as run5
+from neo4j import GraphDatabase
+
+st.set_page_config(
+    page_title="Molecular Intelligence Platform",
+    page_icon="🧬",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+st.markdown("""
+<style>
+/* Remove Streamlit default top padding */
+[data-testid="stAppViewContainer"] > [data-testid="stMain"] > div:first-child {
+    padding-top: 0rem !important;
+}
+
+[data-testid="stMain"] .block-container {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+}
+
+/* Hide Streamlit top toolbar */
+[data-testid="stToolbar"] {
+    display: none !important;
+}
+
+/* Hide Deploy button and menu */
+header[data-testid="stHeader"] {
+    display: none !important;
+}
+@keyframes softShift {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+[data-testid="stAppViewContainer"] {
+    background: linear-gradient(135deg, #f5f0ff 0%, #ede7ff 30%, #f0e6ff 60%, #e8f0ff 100%) !important;
+    background-size: 400% 400% !important;
+    animation: softShift 20s ease infinite !important;
+    position: relative;
+}
+[data-testid="stAppViewContainer"]::before {
+    content: '';
+    position: fixed;
+    width: 600px; height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(147,112,219,0.12) 0%, rgba(138,99,210,0.06) 40%, transparent 70%);
+    top: -150px; left: -100px;
+    pointer-events: none; z-index: 0;
+}
+[data-testid="stAppViewContainer"]::after {
+    content: '';
+    position: fixed;
+    width: 500px; height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(180,150,255,0.1) 0%, rgba(160,120,240,0.05) 40%, transparent 70%);
+    bottom: -100px; right: -80px;
+    pointer-events: none; z-index: 0;
+}
+[data-testid="stMain"] {
+    position: relative; z-index: 1;
+    background: rgba(255,255,255,0.45) !important;
+    backdrop-filter: blur(8px);
+}
+[data-testid="stSidebar"] {
+    background: rgba(240,234,255,0.95) !important;
+    backdrop-filter: blur(12px);
+    border-right: 1px solid rgba(147,112,219,0.25) !important;
+    z-index: 2;
+    min-width: 280px !important;
+    max-width: 280px !important;
+}
+[data-testid="stSidebar"] > div:first-child {
+    overflow-y: auto !important;
+    height: 100vh !important;
+}
+.stApp, .stMarkdown, p, label, span { color: #3a2a5c !important; }
+[data-testid="metric-container"] {
+    background: rgba(255,255,255,0.85) !important;
+    border: 1px solid rgba(147,112,219,0.3) !important;
+    border-radius: 12px; padding: 20px;
+    box-shadow: 0 2px 12px rgba(147,112,219,0.1);
+}
+[data-testid="metric-container"] [data-testid="stMetricValue"] {
+    color: #7c3aed !important; font-size: 1.8rem !important; font-weight: 700 !important;
+}
+[data-testid="metric-container"] [data-testid="stMetricLabel"] {
+    color: #9b7fd4 !important; font-size: 0.85rem !important;
+    text-transform: uppercase; letter-spacing: 1px;
+}
+[data-testid="stExpander"] {
+    background: rgba(255,255,255,0.8);
+    border: 1px solid rgba(147,112,219,0.25);
+    border-radius: 10px; margin-bottom: 10px;
+}
+.stButton > button {
+    background: linear-gradient(135deg, #7c3aed, #9d5cf6) !important;
+    color: white !important; border: none !important;
+    border-radius: 8px; padding: 12px 24px;
+    font-weight: 600; letter-spacing: 0.5px; width: 100%; transition: all 0.3s;
+}
+.stButton > button:hover {
+    background: linear-gradient(135deg, #6d28d9, #8b46f0) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(124,58,237,0.3) !important;
+}
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea {
+    background: rgba(255,255,255,0.95) !important;
+    border: 1px solid rgba(147,112,219,0.4) !important;
+    border-radius: 8px !important; color: #3a2a5c !important;
+}
+.stSelectbox > div > div,
+.stMultiSelect > div > div {
+    background: rgba(255,255,255,0.95) !important;
+    border: 1px solid rgba(147,112,219,0.4) !important;
+    border-radius: 8px !important; color: #3a2a5c !important;
+}
+.stSuccess {
+    background: rgba(134,239,172,0.2) !important;
+    border: 1px solid rgba(74,222,128,0.4) !important; border-radius: 8px !important;
+}
+.stWarning {
+    background: rgba(253,224,71,0.2) !important;
+    border: 1px solid rgba(250,204,21,0.4) !important; border-radius: 8px !important;
+}
+hr { border-color: rgba(147,112,219,0.2) !important; }
+.gradient-text {
+    background: linear-gradient(135deg, #7c3aed, #a855f7, #c084fc);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    font-size: 2.8rem; font-weight: 800; line-height: 1.2;
+}
+.subtitle {
+    color: #9b7fd4 !important; font-size: 1rem;
+    letter-spacing: 2px; text-transform: uppercase; margin-bottom: 2rem;
+}
+.drug-card {
+    background: rgba(255,255,255,0.88);
+    border: 1px solid rgba(147,112,219,0.3); border-radius: 12px;
+    padding: 16px 20px; margin-bottom: 12px; border-left: 4px solid #7c3aed;
+    box-shadow: 0 2px 8px rgba(147,112,219,0.1);
+}
+.gene-badge {
+    display: inline-block; background: rgba(124,58,237,0.1);
+    border: 1px solid rgba(124,58,237,0.35); color: #7c3aed;
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 0.8rem; font-weight: 600; margin: 2px;
+}
+.section-header {
+    color: #7c3aed !important; font-size: 0.85rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 2px;
+    border-bottom: 1px solid rgba(147,112,219,0.25);
+    padding-bottom: 6px; margin-bottom: 12px; margin-top: 4px;
+}
+.stSpinner > div { border-top-color: #7c3aed !important; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #f5f0ff; }
+::-webkit-scrollbar-thumb { background: #c4b0f0; border-radius: 2px; }
+</style>
+""", unsafe_allow_html=True)
+
+# ─── SIDEBAR ─────────────────────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("""
+    <div style='text-align:center; padding: 8px 0 16px;'>
+        <div style='font-size:2rem;'>🧬</div>
+        <div style='color:#7c3aed; font-weight:700; font-size:1rem; letter-spacing:1px;'>MOLECULAR INTEL</div>
+        <div style='color:#9b7fd4; font-size:0.7rem; letter-spacing:2px;'>TREATMENT AI</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<div class='section-header'>Patient Information</div>", unsafe_allow_html=True)
+    patient_id = st.text_input("Patient ID", value="P-1001")
+
+    col_age, col_gender = st.columns(2)
+    with col_age:
+        age = st.selectbox("Age", list(range(18, 91)), index=37)
+    with col_gender:
+        gender = st.selectbox("Gender", ["Female", "Male", "Other"])
+
+    cancer_type = st.selectbox("Cancer Type", [
+        "Breast Cancer", "Lung Cancer", "Colorectal Cancer",
+        "Ovarian Cancer", "Prostate Cancer", "Leukemia",
+        "Melanoma", "Pancreatic Cancer"
+    ])
+
+    prior_treatment = st.selectbox("Prior Treatment", [
+        "None", "Chemotherapy", "Hormone Therapy",
+        "Immunotherapy", "Radiation", "Surgery"
+    ])
+
+    st.markdown("<div class='section-header'>Genomic Profile</div>", unsafe_allow_html=True)
+    mutations_selected = st.multiselect(
+        "Gene Mutations (select all that apply)",
+        ["BRCA1", "BRCA2", "TP53", "ERBB2", "MYC", "PIK3CA",
+         "EGFR", "ALK", "KRAS", "RET",
+         "APC", "BRAF", "PTEN", "MLH1",
+         "BRAF_V600E", "NRAS", "CDKN2A",
+         "FLT3", "BCR_ABL1"],
+        default=["BRCA1"]
+    )
+
+    additional_notes = st.text_area(
+        "Additional Notes (optional)",
+        placeholder="Any other clinical details...", height=60
+    )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    run_pipeline = st.button("🚀 Run Analysis", type="primary")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header'>System Status</div>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style='font-size:0.78rem; color:#9b7fd4;'>
+        <div style='margin-bottom:5px;'>🟢 Neo4j graph connected</div>
+        <div style='margin-bottom:5px;'>🟢 Vector store ready</div>
+        <div>🟢 XGBoost model loaded</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ─── MAIN HEADER ─────────────────────────────────────────────────────────────
+st.markdown("<div class='gradient-text'>Molecular Intelligence</div>", unsafe_allow_html=True)
+st.markdown("<div class='subtitle'>Autonomous Treatment Recommendation Platform</div>", unsafe_allow_html=True)
+
+# ─── PIPELINE ────────────────────────────────────────────────────────────────
+if run_pipeline:
+    if not mutations_selected:
+        st.warning("Please select at least one gene mutation to run the analysis.")
+        st.stop()
+
+    mutation_text  = ", ".join(mutations_selected)
+    clinical_notes = (
+        f"{age} year old {gender.lower()} with {cancer_type} diagnosis. "
+        f"Gene mutations detected: {mutation_text}. "
+        f"Prior treatment: {prior_treatment}. "
+        f"{additional_notes if additional_notes else ''}"
+    ).strip()
+
+    state = {
+        "patient_id": patient_id,
+        "raw_profile": {"notes": clinical_notes},
+        "mutations": [], "cnvs": [], "expression": {},
+        "graph_results": [], "rag_evidence": "",
+        "ranked_treatments": [], "rationale": "",
+        "human_decision": "", "approved_drug": None,
+        "outcome": None, "feedback_logged": False
+    }
+
+    progress = st.progress(0)
+    with st.spinner("🔬 Agent 1 — Extracting genomic features..."):
+        state = run1(state); progress.progress(20)
+    with st.spinner("🕸️ Agent 2 — Querying knowledge graph..."):
+        state = run2(state); progress.progress(40)
+    with st.spinner("📚 Agent 3 — Retrieving literature evidence..."):
+        state = run3(state); progress.progress(60)
+    with st.spinner("🤖 Agent 4 — Ranking treatments with XGBoost..."):
+        state = run4(state); progress.progress(80)
+    with st.spinner("✍️ Agent 5 — Generating clinical rationale..."):
+        state = run5(state); progress.progress(100)
+
+    st.session_state['state'] = state
+    st.session_state['form']  = {
+        "age": age, "gender": gender,
+        "cancer_type": cancer_type,
+        "prior_treatment": prior_treatment
+    }
+    progress.empty()
+    st.success("✅ Pipeline complete — review recommendations below")
+
+# ─── RESULTS ─────────────────────────────────────────────────────────────────
+if 'state' in st.session_state:
+    state = st.session_state['state']
+    form  = st.session_state.get('form', {})
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("🧬 Mutations",     len(state['mutations']))
+    c2.metric("🕸️ Graph matches",  len(state['graph_results']))
+    c3.metric("💊 Treatments",    len(state['ranked_treatments']))
+    c4.metric("🎯 Top score",
+        f"{round(float(state['ranked_treatments'][0]['ml_score']) * 100, 1)}%"
+        if state['ranked_treatments'] else "—")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.divider()
+    col_left, col_right = st.columns([3, 2])
+
+    with col_left:
+        st.markdown("<div class='section-header'>Ranked Treatment Recommendations</div>", unsafe_allow_html=True)
+        colors = ["#7c3aed", "#9d5cf6", "#c084fc"]
+        for i, t in enumerate(state['ranked_treatments']):
+            score_pct    = round(t['ml_score'] * 100, 1)
+            response_pct = round(t['response_rate'] * 100, 1)
+            color = colors[i] if i < len(colors) else "#9d5cf6"
+            st.markdown(f"""
+            <div class='drug-card' style='border-left-color:{color};'>
+                <div style='display:flex; justify-content:space-between; align-items:center;'>
+                    <div>
+                        <span style='color:{color}; font-size:1.4rem; font-weight:800;'>#{i+1}</span>
+                        <span style='color:#2d1b5e; font-size:1.1rem; font-weight:600; margin-left:10px;'>{t['drug']}</span>
+                        <span class='gene-badge' style='margin-left:8px;'>{t['gene']}</span>
+                    </div>
+                    <div style='text-align:right;'>
+                        <div style='color:{color}; font-size:1.3rem; font-weight:700;'>{score_pct}%</div>
+                        <div style='color:#9b7fd4; font-size:0.75rem;'>ML confidence</div>
+                    </div>
+                </div>
+                <div style='margin-top:10px; background:rgba(147,112,219,0.1); border-radius:6px; height:6px;'>
+                    <div style='width:{score_pct}%; background:{color}; height:6px; border-radius:6px;'></div>
+                </div>
+                <div style='margin-top:8px; color:#9b7fd4; font-size:0.8rem;'>
+                    Historical response rate: {response_pct}%
+                </div>
+            </div>""", unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        if state['ranked_treatments']:
+            st.markdown("<div class='section-header'>Treatment Comparison</div>", unsafe_allow_html=True)
+            fig = go.Figure()
+            fig.add_trace(go.Bar(name='ML Confidence %',
+                x=[t['drug'] for t in state['ranked_treatments']],
+                y=[round(t['ml_score']*100,1) for t in state['ranked_treatments']],
+                marker_color='#9d5cf6', marker_line_color='#c4b0f0', marker_line_width=1))
+            fig.add_trace(go.Bar(name='Response Rate %',
+                x=[t['drug'] for t in state['ranked_treatments']],
+                y=[round(t['response_rate']*100,1) for t in state['ranked_treatments']],
+                marker_color='#c084fc', marker_line_color='#ddd0ff', marker_line_width=1))
+            fig.update_layout(
+                barmode='group',
+                paper_bgcolor='rgba(255,255,255,0)',
+                plot_bgcolor='rgba(245,240,255,0.6)',
+                font=dict(color='#3a2a5c', size=12),
+                legend=dict(bgcolor='rgba(255,255,255,0.8)', bordercolor='rgba(147,112,219,0.3)', borderwidth=1),
+                xaxis=dict(gridcolor='rgba(147,112,219,0.15)', linecolor='rgba(147,112,219,0.2)'),
+                yaxis=dict(gridcolor='rgba(147,112,219,0.15)', linecolor='rgba(147,112,219,0.2)', range=[0,105]),
+                margin=dict(l=0,r=0,t=10,b=0), height=260
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        st.markdown("<div class='section-header'>Clinical Rationale</div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style='background:rgba(255,255,255,0.85); border:1px solid rgba(147,112,219,0.25);
+                    border-radius:10px; padding:16px; line-height:1.8; color:#4a3a6c;'>
+        {state['rationale'].replace(chr(10), '<br>')}
+        </div>""", unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<div class='section-header'>Supporting Literature</div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style='background:rgba(124,58,237,0.05); border:1px solid rgba(124,58,237,0.15);
+                    border-radius:10px; padding:16px; font-size:0.88rem; color:#7c5cbf; line-height:1.8;'>
+        {state['rag_evidence'].replace(chr(10),'<br><br>') if state['rag_evidence']
+         else '<span style="color:#c4b0f0">No literature evidence retrieved for this profile.</span>'}
+        </div>""", unsafe_allow_html=True)
+
+    with col_right:
+        st.markdown("<div class='section-header'>Patient Summary</div>", unsafe_allow_html=True)
+        mutations_html = "".join([f"<span class='gene-badge'>{m}</span>" for m in state['mutations']])
+        cnv_html = "".join([f"<span class='gene-badge' style='border-color:rgba(251,146,60,0.4);color:#ea580c;background:rgba(251,146,60,0.1);'>{c}</span>" for c in state['cnvs']])
+        st.markdown(f"""
+        <div style='background:rgba(255,255,255,0.85); border:1px solid rgba(147,112,219,0.25);
+                    border-radius:10px; padding:16px; margin-bottom:16px;'>
+            <div style='display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;'>
+                <div>
+                    <div style='color:#9b7fd4; font-size:0.7rem; text-transform:uppercase; letter-spacing:1px;'>Patient ID</div>
+                    <div style='color:#7c3aed; font-family:monospace; font-size:0.9rem;'>{state['patient_id']}</div>
+                </div>
+                <div>
+                    <div style='color:#9b7fd4; font-size:0.7rem; text-transform:uppercase; letter-spacing:1px;'>Age / Gender</div>
+                    <div style='color:#3a2a5c; font-size:0.9rem;'>{form.get("age","—")} / {form.get("gender","—")}</div>
+                </div>
+                <div>
+                    <div style='color:#9b7fd4; font-size:0.7rem; text-transform:uppercase; letter-spacing:1px;'>Cancer Type</div>
+                    <div style='color:#3a2a5c; font-size:0.9rem;'>{form.get("cancer_type","—")}</div>
+                </div>
+                <div>
+                    <div style='color:#9b7fd4; font-size:0.7rem; text-transform:uppercase; letter-spacing:1px;'>Prior Treatment</div>
+                    <div style='color:#3a2a5c; font-size:0.9rem;'>{form.get("prior_treatment","—")}</div>
+                </div>
+            </div>
+            <div style='color:#9b7fd4; font-size:0.7rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;'>Gene Mutations</div>
+            <div>{mutations_html if mutations_html else '<span style="color:#c4b0f0">None detected</span>'}</div>
+            <div style='color:#9b7fd4; font-size:0.7rem; text-transform:uppercase; letter-spacing:1px; margin:10px 0 6px;'>Copy Number Variants</div>
+            <div>{cnv_html if cnv_html else '<span style="color:#c4b0f0">None detected</span>'}</div>
+        </div>""", unsafe_allow_html=True)
+
+        if state['graph_results']:
+            st.markdown("<div class='section-header'>Knowledge Graph Matches</div>", unsafe_allow_html=True)
+            for r in state['graph_results']:
+                st.markdown(f"""
+                <div style='background:rgba(255,255,255,0.85); border:1px solid rgba(147,112,219,0.25);
+                            border-radius:8px; padding:10px 14px; margin-bottom:8px;
+                            display:flex; justify-content:space-between;'>
+                    <div>
+                        <span style='color:#7c3aed; font-weight:600;'>{r['gene']}</span>
+                        <span style='color:#c4b0f0; margin:0 8px;'>→</span>
+                        <span style='color:#3a2a5c;'>{r['drug']}</span>
+                    </div>
+                    <div style='color:#059669; font-weight:600;'>{round(r['response_rate']*100)}%</div>
+                </div>""", unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<div class='section-header'>Oncologist Review</div>", unsafe_allow_html=True)
+
+        if state['ranked_treatments']:
+            approved_drug = st.selectbox("Approve treatment",
+                [t['drug'] for t in state['ranked_treatments']])
+            outcome = st.selectbox("Expected outcome",
+                ["positive", "partial_response", "stable_disease", "progressive"])
+            notes = st.text_area("Clinical notes", height=80,
+                placeholder="Add oncologist notes here...")
+            if st.button("✅ Approve & Log to Knowledge Graph"):
+                driver = GraphDatabase.driver("bolt://localhost:7687", auth=None)
+                with driver.session() as session:
+                    session.run("""
+                        MERGE (p:Patient {id: $pid})
+                        MERGE (d:Drug {name: $drug})
+                        MERGE (p)-[r:RECEIVED_TREATMENT]->(d)
+                        SET r.outcome=$outcome, r.notes=$notes, r.timestamp=datetime()
+                    """, pid=state['patient_id'], drug=approved_drug,
+                         outcome=outcome, notes=notes)
+                driver.close()
+                st.success(f"✅ {approved_drug} approved and logged for {state['patient_id']}")
+                st.balloons()
+        else:
+            st.markdown("""
+            <div style='color:#9b7fd4; font-size:0.85rem; padding:12px;
+                        border:1px solid rgba(147,112,219,0.25); border-radius:8px;'>
+                No treatments to approve — run the analysis first.
+            </div>""", unsafe_allow_html=True)
+
+else:
+    st.markdown("""
+    <div style='text-align:center; padding:80px 20px;'>
+        <div style='font-size:4rem; margin-bottom:20px;'>🧬</div>
+        <div style='font-size:1.2rem; color:#9b7fd4; margin-bottom:10px;'>
+            Select patient details in the sidebar and click Run Analysis
+        </div>
+        <div style='font-size:0.9rem; color:#c4b0f0;'>
+            5-agent pipeline · Neo4j knowledge graph · XGBoost ranking · LangGraph orchestration
+        </div>
+    </div>""", unsafe_allow_html=True)
