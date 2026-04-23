@@ -1,0 +1,106 @@
+from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv
+import json
+import os
+from security.llm_wrapper import SecureLLMClient
+
+load_dotenv()
+
+from security.guardrails import validate_input, scrub_pii
+
+def run(state):
+    print("Agent 1 running — extracting genomic features...")
+
+    raw_text = state['raw_profile'].get('notes', '')
+
+    # Validate input
+    is_valid, error = validate_input(raw_text)
+    if not is_valid:
+        print(f"Input validation failed: {error}")
+        state['mutations'] = []
+        state['cnvs'] = []
+        state['expression'] = {}
+        return state
+
+    # Scrub PII before sending to LLM
+    clean_text = scrub_pii(raw_text)
+    state['raw_profile']['notes'] = clean_text
+
+
+
+def run(state):
+   
+    print("Agent 1 running — extracting genomic features...")
+    
+    # Initialize secure LLM wrapper (ADD THIS LINE)
+    from security.llm_wrapper import SecureLLMClient
+    secure_llm = SecureLLMClient(model="gpt-4o-mini", temperature=0.3)
+    
+    raw_text = state['raw_profile'].get('notes', '')
+    
+    
+    print("Agent 1 running — extracting genomic features...")
+
+    prompt = f"""
+    You are a clinical genomics AI assistant.
+    Extract all gene mutations, copy number variants (CNVs),
+    and expression levels from this patient profile.
+
+    Return ONLY a JSON object with exactly these keys:
+    - mutations: list of gene names with mutations
+    - cnvs: list of genes with copy number variants  
+    - expression: dict of gene name to expression level (float)
+
+    Patient profile: {state['raw_profile']}
+
+    Return only valid JSON, no extra text.
+    """
+
+    result = llm.invoke(prompt)
+
+    try:
+        extracted = json.loads(result.content)
+        state['mutations'] = extracted.get('mutations', [])
+        state['cnvs'] = extracted.get('cnvs', [])
+        state['expression'] = extracted.get('expression', {})
+    except json.JSONDecodeError:
+        state['mutations'] = []
+        state['cnvs'] = []
+        state['expression'] = {}
+
+    print(f"Mutations found: {state['mutations']}")
+    return state
+# Use secure LLM wrapper with guardrails
+llm_result = secure_llm.chat_completion(
+    prompt=prompt,
+    system_message="You are a clinical genomics AI assistant. Extract gene mutations, copy number variants (CNVs), and expression data from clinical notes. Respond ONLY with valid JSON.",
+    user_role='all'
+)
+
+if llm_result['success']:
+    try:
+        extracted = json.loads(llm_result['response'])
+        state['mutations'] = extracted.get('mutations', [])
+        state['cnvs'] = extracted.get('cnvs', [])
+        state['expression'] = extracted.get('expression', {})
+        
+        # Log any security warnings
+        if llm_result['warnings']:
+            print(f"⚠️ LLM output filtered: {llm_result['warnings']}")
+        
+        if llm_result['pii_detected_in_input']:
+            print(f"⚠️ PII masked from input: {llm_result['pii_detected_in_input']}")
+            
+    except json.JSONDecodeError:
+        print("❌ Failed to parse LLM JSON response")
+        state['mutations'] = []
+        state['cnvs'] = []
+        state['expression'] = {}
+else:
+    print(f"❌ LLM call failed: {llm_result['error']}")
+    state['mutations'] = []
+    state['cnvs'] = []
+    state['expression'] = {}
+
+print(f"Mutations found: {state['mutations']}")
+return state

@@ -1,0 +1,122 @@
+from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+from security.llm_wrapper import SecureLLMClient
+
+# Initialize secure LLM client
+secure_llm = SecureLLMClient(model="gpt-4o-mini", temperature=0.3)
+
+
+def run(state):
+    print("Agent 5 running — generating clinical rationale...")
+
+    treatments = state['ranked_treatments'][:3]
+    evidence = state['rag_evidence']
+    mutations = state['mutations']
+
+    prompt = f"""
+    You are a clinical oncology AI assistant.
+
+    Patient mutations: {mutations}
+
+    Top ranked treatments:
+    {treatments}
+
+    Supporting literature evidence:
+    {evidence}
+
+    For each treatment, write exactly 2 sentences of
+    clinical rationale explaining why it is recommended
+    for this patient based on their mutations and the evidence.
+
+    Format your response as:
+    1. [Drug name]: [2 sentence rationale]
+    2. [Drug name]: [2 sentence rationale]
+    3. [Drug name]: [2 sentence rationale]
+    """
+
+    # Use secure LLM wrapper with guardrails
+result = secure_llm.chat_completion(
+    prompt=prompt,
+    system_message="You are a clinical oncology AI assistant.",
+    user_role='all'
+)
+
+if result['success']:
+    state['rationale'] = result['response']
+    
+    # Log any warnings
+    if result['warnings']:
+        print(f"⚠️ LLM output filtered. Warnings: {result['warnings']}")
+    
+    if result['pii_detected_in_input']:
+        print(f"⚠️ PII detected and masked in input: {result['pii_detected_in_input']}")
+else:
+    print(f"❌ LLM call failed: {result['error']}")
+    state['rationale'] = "Error generating rationale"
+    print("Rationale generated.")
+    print(state['rationale'])
+    return state
+from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+def run(state):
+    print("Agent 5 running — generating clinical rationale...")
+    
+    # Initialize secure LLM wrapper INSIDE the function
+    from security.llm_wrapper import SecureLLMClient
+    secure_llm = SecureLLMClient(model="gpt-4o-mini", temperature=0.3)
+    
+    treatments = state['ranked_treatments'][:3]
+    evidence = state['rag_evidence']
+    mutations = state['mutations']
+    
+    prompt = f"""
+You are a clinical oncology AI assistant.
+
+Patient mutations: {mutations}
+
+Top ranked treatments:
+{treatments}
+
+Supporting literature evidence:
+{evidence}
+
+For each treatment, write exactly 2 sentences of
+clinical rationale explaining why it is recommended
+for this patient based on their mutations and the evidence.
+
+Format your response as:
+1. [Drug name]: [2 sentence rationale]
+2. [Drug name]: [2 sentence rationale]
+3. [Drug name]: [2 sentence rationale]
+"""
+    
+    # Use secure LLM wrapper with guardrails
+    result = secure_llm.chat_completion(
+        prompt=prompt,
+        system_message="You are a clinical oncology AI assistant.",
+        user_role='all'
+    )
+    
+    if result['success']:
+        state['rationale'] = result['response']
+        
+        # Log any warnings
+        if result['warnings']:
+            print(f"⚠️ LLM output filtered. Warnings: {result['warnings']}")
+        
+        if result['pii_detected_in_input']:
+            print(f"⚠️ PII detected and masked in input: {result['pii_detected_in_input']}")
+    else:
+        print(f"❌ LLM call failed: {result['error']}")
+        state['rationale'] = "Error generating rationale"
+    
+    print("Rationale generated.")
+    print(state['rationale'])
+    return state

@@ -2,9 +2,12 @@ import streamlit as st
 import sys
 import os
 from dotenv import load_dotenv
+import os
 from pathlib import Path
 from datetime import datetime
 
+# Add to imports section
+import sys
 sys.path.append('/home/deepekagurunathan/molecular-intel-agent')
 
 from security.input_validator import InputValidator
@@ -12,11 +15,13 @@ from security.llm_guardrails import LLMGuardrails
 from security.data_security import DataSecurityHandler
 from security.action_control import ActionController
 
+# Initialize security components
 validator = InputValidator()
 guardrails = LLMGuardrails()
 data_security = DataSecurityHandler()
 action_controller = ActionController()
 
+# Load .env from project root, not dashboard folder
 env_path = Path(__file__).parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 import plotly.graph_objects as go
@@ -31,6 +36,7 @@ from agents.agent4_ranker import run as run4
 from agents.agent5_rationale import run as run5
 from neo4j import GraphDatabase
 
+# Security imports - add these lines
 from utils.security_guardrails import (
     validate_input,
     scrub_pii,
@@ -51,16 +57,25 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+/* Remove Streamlit default top padding */
 [data-testid="stAppViewContainer"] > [data-testid="stMain"] > div:first-child {
     padding-top: 0rem !important;
 }
+
 [data-testid="stMain"] .block-container {
     padding-top: 1rem !important;
     padding-bottom: 1rem !important;
 }
-[data-testid="stToolbar"] { display: none !important; }
-header[data-testid="stHeader"] { display: none !important; }
 
+/* Hide Streamlit top toolbar */
+[data-testid="stToolbar"] {
+    display: none !important;
+}
+
+/* Hide Deploy button and menu */
+header[data-testid="stHeader"] {
+    display: none !important;
+}
 @keyframes softShift {
     0%   { background-position: 0% 50%; }
     50%  { background-position: 100% 50%; }
@@ -158,6 +173,15 @@ header[data-testid="stHeader"] { display: none !important; }
     border: 1px solid rgba(250,204,21,0.4) !important; border-radius: 8px !important;
 }
 hr { border-color: rgba(147,112,219,0.2) !important; }
+.gradient-text {
+    background: linear-gradient(135deg, #7c3aed, #a855f7, #c084fc);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    font-size: 2.8rem; font-weight: 800; line-height: 1.2;
+}
+.subtitle {
+    color: #9b7fd4 !important; font-size: 1rem;
+    letter-spacing: 2px; text-transform: uppercase; margin-bottom: 2rem;
+}
 .drug-card {
     background: rgba(255,255,255,0.88);
     border: 1px solid rgba(147,112,219,0.3); border-radius: 12px;
@@ -180,7 +204,12 @@ hr { border-color: rgba(147,112,219,0.2) !important; }
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: #f5f0ff; }
 ::-webkit-scrollbar-thumb { background: #c4b0f0; border-radius: 2px; }
+</style>
+""", unsafe_allow_html=True)
 
+# ─── TITLE ─────────────────────────────────────────────────────────────────
+st.markdown("""
+<style>
 @keyframes rotate {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
@@ -199,10 +228,6 @@ hr { border-color: rgba(147,112,219,0.2) !important; }
     animation: pulse 0.5s ease-in-out;
 }
 </style>
-""", unsafe_allow_html=True)
-
-# ─── TITLE ──────────────────────────────────────────────────────────────────
-st.markdown("""
 <div style='text-align:center; padding: 20px 0 30px;'>
     <div class='dna-icon'>🧬</div>
     <div style='color:#7c3aed; font-weight:800; font-size:3rem; letter-spacing:3px; margin-bottom:8px;'>MOLECULAR INTEL</div>
@@ -210,11 +235,14 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ─── SIDEBAR ────────────────────────────────────────────────────────────────
+# ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("<div class='section-header'>Patient Information</div>", unsafe_allow_html=True)
-
+    
+    # Patient ID with validation
     patient_id_raw = st.text_input("Patient ID", value="P-1001", max_chars=50)
+
+    # Validate Patient ID
     is_valid_id, id_error = validate_patient_id(patient_id_raw)
     if not is_valid_id:
         st.error(f"❌ {id_error}")
@@ -249,113 +277,102 @@ with st.sidebar:
          "FLT3T", "BCR_ABL1"],
         default=["BRCA1"]
     )
-
+    
     additional_notes = st.text_area(
         "Additional Notes (optional)",
         placeholder="Any other clinical details...",
         height=100
-    )
-
-# ─── SESSION STATE INIT ─────────────────────────────────────────────────────
-if "show_consent" not in st.session_state:
-    st.session_state["show_consent"] = False
-if "consent_given" not in st.session_state:
-    st.session_state["consent_given"] = False
-if "validated_inputs" not in st.session_state:
-    st.session_state["validated_inputs"] = None
+    )    
 
 # ===== RUN ANALYSIS BUTTON =====
 if st.sidebar.button("🔬 Run Analysis"):
-    st.session_state["show_consent"] = False
-    st.session_state["consent_given"] = False
-
+    
+    # ===== SECURITY LAYER 1: INPUT VALIDATION =====
     valid_pid, pid_error = validator.validate_patient_id(patient_id)
     if not valid_pid:
         st.error(f"❌ {pid_error}")
         st.stop()
-
+    
     valid_age, age_error = validator.validate_age(age)
     if not valid_age:
         st.error(f"❌ {age_error}")
         st.stop()
-
+    
+    # ===== MUTATION VALIDATION =====
     if not mutations_selected:
         st.warning("⚠️ Please select at least one gene mutation to run the analysis.")
         st.stop()
-
-    st.session_state["validated_inputs"] = {
-        "patient_id": patient_id,
-        "age": age,
-        "gender": gender,
-        "cancer_type": cancer_type,
-        "prior_treatment": prior_treatment,
-        "mutations_selected": mutations_selected,
-        "additional_notes": additional_notes
-    }
-    st.session_state["show_consent"] = True
-
-# ===== CONSENT SECTION (persists across reruns via session_state) =====
-if st.session_state.get("show_consent") and not st.session_state.get("consent_given"):
+    
+    # ===== LEVEL 1: USER CONSENT =====
     st.markdown("---")
     st.warning("⚠️ **Research Tool Only** - All recommendations require clinical verification before patient care")
-
+    
     with st.expander("📋 Understanding This Analysis", expanded=True):
         col1, col2 = st.columns(2)
+        
         with col1:
             st.markdown("**✅ This System WILL:**")
             st.markdown("""
-- Extract genomic features from clinical notes
-- Search knowledge graph for treatment matches
-- Rank treatments using ML algorithms
-- Generate supporting clinical rationale
-- Provide literature references
-- Mask any detected PII in logs
+            - Extract genomic features from clinical notes
+            - Search knowledge graph for treatment matches
+            - Rank treatments using ML algorithms
+            - Generate supporting clinical rationale
+            - Provide literature references
+            - Mask any detected PII in logs
             """)
+        
         with col2:
             st.markdown("**❌ This System will NOT:**")
             st.markdown("""
-- Prescribe specific dosages or schedules
-- Make definitive diagnoses
-- Replace physician clinical judgment
-- Provide emergency medical advice
-- Guarantee treatment outcomes
-- Contact patients or healthcare providers
+            - Prescribe specific dosages or schedules
+            - Make definitive diagnoses
+            - Replace physician clinical judgment
+            - Provide emergency medical advice
+            - Guarantee treatment outcomes
+            - Contact patients or healthcare providers
             """)
-
+    
     st.info("**Important**: This system uses external AI services (OpenAI) which may incur costs and send data outside your system.")
-
+    
+    # Required user acknowledgment
     confirm_understanding = st.checkbox(
         "✓ I understand this is a research tool and will verify all recommendations with qualified healthcare professionals before any clinical use",
         key="confirm_research_tool"
     )
+    
+if not confirm_understanding:
+    st.info("👆 Please confirm your understanding before proceeding")
+    st.stop()
 
-    if confirm_understanding:
-        if st.button("▶️ Proceed with Analysis"):
-            st.session_state["consent_given"] = True
-            st.rerun()
-    else:
-        st.info("👆 Please confirm your understanding before proceeding")
-
-# ===== RUN PIPELINE (after consent given) =====
-if st.session_state.get("consent_given") and st.session_state.get("validated_inputs"):
-    inputs = st.session_state["validated_inputs"]
-    patient_id        = inputs["patient_id"]
-    age               = inputs["age"]
-    gender            = inputs["gender"]
-    cancer_type       = inputs["cancer_type"]
-    prior_treatment   = inputs["prior_treatment"]
-    mutations_selected = inputs["mutations_selected"]
-    additional_notes  = inputs["additional_notes"]
-
-    data_security.secure_log("user_consent", {
+# Log the user consent (this should be here)
+    data_security.log_security_event(
+    event_type="user_consent",
+    details={
         "patient_id": patient_id,
         "timestamp": datetime.now().isoformat(),
         "action": "analysis_authorized",
         "mutations_count": len(mutations_selected)
-    })
+            }
+     )
+
+st.success("✓ User consent recorded - proceeding with analysis")
+st.markdown("---")
+    
+    # Log the user consent
+        data_security.log_security_event(
+        event_type="user_consent",
+        details={
+            "patient_id": patient_id,
+            "timestamp": datetime.now().isoformat(),
+            "action": "analysis_authorized",
+            "mutations_count": len(mutations_selected)
+        }
+    )
+    
     st.success("✓ User consent recorded - proceeding with analysis")
     st.markdown("---")
-
+    
+    # ===== SECURITY LAYER 2: PROMPT INJECTION DETECTION =====
     is_suspicious, patterns = validator.detect_prompt_injection(additional_notes)
     if is_suspicious:
         st.error("⚠️ **Security Alert**: Suspicious input detected in clinical notes.")
@@ -364,22 +381,23 @@ if st.session_state.get("consent_given") and st.session_state.get("validated_inp
             'patient_id': patient_id,
             'pattern_count': len(patterns)
         }, level='WARNING')
-        st.session_state["consent_given"] = False
         st.stop()
-
+    
+    # ===== SECURITY LAYER 3: INPUT SANITIZATION =====
     clean_notes = validator.sanitize_clinical_notes(additional_notes)
     masked_result = data_security.mask_pii(clean_notes)
     if masked_result["pii_detected"]:
         st.warning(f"⚠️ **Privacy Protection**: Detected and masked: {', '.join(masked_result['pii_detected'])}")
-
+    
     data_security.secure_log('analysis_started', {
         'patient_id': patient_id,
         'cancer_type': cancer_type,
         'mutation_count': len(mutations_selected),
         'has_notes': len(masked_result['masked_text']) > 0
     })
-
-    safe_notes = masked_result['masked_text']
+    
+    # ===== BUILD CLINICAL NOTES WITH SANITIZED DATA =====
+    safe_notes = masked_result['masked_text']    
     mutation_text = ", ".join(mutations_selected)
     clinical_notes = (
         f"{age} year old {gender.lower()} with {cancer_type} diagnosis. "
@@ -387,23 +405,25 @@ if st.session_state.get("consent_given") and st.session_state.get("validated_inp
         f"Prior treatment: {prior_treatment}. "
         f"{safe_notes if safe_notes else ''}"
     ).strip()
-
-    state = {
+    
+    # ===== CREATE STATE FOR PIPELINE =====
+    state = {   
         "patient_id": patient_id,
         "raw_profile": {"notes": clinical_notes},
-        "mutations": mutations_selected,
-        "cnvs": [],
+        "mutations": mutations_selected, 
+        "cnvs": [], 
         "expression": {},
-        "graph_results": [],
+        "graph_results": [], 
         "rag_evidence": "",
-        "ranked_treatments": [],
+        "ranked_treatments": [], 
         "rationale": "",
-        "human_decision": "",
+        "human_decision": "", 
         "approved_drug": None,
-        "outcome": None,
+        "outcome": None, 
         "feedback_logged": False
     }
 
+    # ===== RUN PIPELINE =====
     progress = st.progress(0)
     with st.spinner("🔬 Agent 1 — Extracting genomic features..."):
         state = run1(state)
@@ -423,19 +443,15 @@ if st.session_state.get("consent_given") and st.session_state.get("validated_inp
 
     st.session_state['state'] = state
     st.session_state['form'] = {
-        "age": age,
+        "age": age, 
         "gender": gender,
         "cancer_type": cancer_type,
         "prior_treatment": prior_treatment
     }
-    # Clear pipeline flags so it doesn't re-run on next rerun
-    st.session_state["consent_given"] = False
-    st.session_state["show_consent"] = False
-    st.session_state["validated_inputs"] = None
     progress.empty()
     st.success("✅ Pipeline complete — review recommendations below")
 
-# ─── RESULTS ────────────────────────────────────────────────────────────────
+# ─── RESULTS ─────────────────────────────────────────────────────────────────
 if 'state' in st.session_state:
     state = st.session_state['state']
     form = st.session_state.get('form', {})
@@ -580,6 +596,7 @@ if 'state' in st.session_state:
                 uri = os.getenv("NEO4J_URI")
                 username = os.getenv("NEO4J_USER") or os.getenv("NEO4J_USERNAME")
                 password = os.getenv("NEO4J_PASSWORD")
+   
                 driver = GraphDatabase.driver(uri, auth=(username, password))
                 with driver.session() as session:
                     session.run("""
@@ -600,14 +617,13 @@ if 'state' in st.session_state:
             </div>""", unsafe_allow_html=True)
 
 else:
-    if not st.session_state.get("show_consent"):
-        st.markdown("""
-        <div style='text-align:center; padding:80px 20px;'>
-            <div style='font-size:4rem; margin-bottom:20px;'>🧬</div>
-            <div style='font-size:1.2rem; color:#9b7fd4; margin-bottom:10px;'>
-                Select patient details in the sidebar and click Run Analysis
-            </div>
-            <div style='font-size:0.9rem; color:#c4b0f0;'>
-                5-agent pipeline · Neo4j knowledge graph · XGBoost ranking · LangGraph orchestration
-            </div>
-        </div>""", unsafe_allow_html=True)
+    st.markdown("""
+    <div style='text-align:center; padding:80px 20px;'>
+        <div style='font-size:4rem; margin-bottom:20px;'>🧬</div>
+        <div style='font-size:1.2rem; color:#9b7fd4; margin-bottom:10px;'>
+            Select patient details in the sidebar and click Run Analysis
+        </div>
+        <div style='font-size:0.9rem; color:#c4b0f0;'>
+            5-agent pipeline · Neo4j knowledge graph · XGBoost ranking · LangGraph orchestration
+        </div>
+    </div>""", unsafe_allow_html=True)
