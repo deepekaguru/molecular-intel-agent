@@ -126,7 +126,7 @@ python load_graph.py
 ```bash
 streamlit run dashboard/app.py
 ```
-Live Demo: https://molecular-agent.duckdns.org/
+Live Demo: https://molecular-agent.duckdns.org
 ---
 
 ## 🔄 How It Works — End to End
