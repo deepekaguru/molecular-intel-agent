@@ -126,7 +126,7 @@ python load_graph.py
 ```bash
 streamlit run dashboard/app.py
 ```
-
+Live Demo: https://molecular-agent.duckdns.org/
 ---
 
 ## 🔄 How It Works — End to End
@@ -154,3 +154,5 @@ streamlit run dashboard/app.py
 The graph self-improves — every oncologist approval adds a `RECEIVED_TREATMENT` edge, enriching future recommendations for similar patient profiles.
 
 ---
+
+
