@@ -2,9 +2,6 @@
 
 A production-grade multi-agent AI system that recommends oncology treatments based on patient genomic profiles. Built with security-first design, human-in-the-loop controls, and a self-improving knowledge graph.
 
-> **Wipro Forward Deployed Engineer Pre-screening Assignment**  
-> Deepeka Gurunathan | April 2026
-
 ---
 
 ## 🎯 Problem Statement
