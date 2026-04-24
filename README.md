@@ -2,7 +2,10 @@
 
 A production-grade multi-agent AI system that recommends oncology treatments based on patient genomic profiles. Built with security-first design, human-in-the-loop controls, and a self-improving knowledge graph.
 
----
+<img width="1836" height="997" alt="image" src="https://github.com/user-attachments/assets/ed387053-6a71-479c-80be-8af5909d8c20" />
+
+<img width="1850" height="988" alt="image" src="https://github.com/user-attachments/assets/b291ebf3-e359-4219-aeb3-c2de1ac79575" />
+
 
 ## 🎯 Problem Statement
 
