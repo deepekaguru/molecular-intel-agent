@@ -95,7 +95,7 @@ class DataSecurityHandler:
         }
         
         # Write to secure log file (not stdout to avoid CloudWatch exposure)
-        log_file = '/home/deepekagurunathan/molecular-intel-agent/logs/secure.log'
+        log_file = '/tmp/logs/secure.log'
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
         
         with open(log_file, 'a') as f:
