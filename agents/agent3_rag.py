@@ -4,10 +4,19 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 import os
 from dotenv import load_dotenv
-
 load_dotenv()
 
-llm = ChatOpenAI(model="gpt-4o-mini", api_key=os.getsecret("OPENAI_API_KEY"))
+# ── Secret helper ─────────────────────────────────────────────
+def get_secret(key):
+    try:
+        import streamlit as st
+        return st.secrets[key]
+    except Exception:
+        return os.getenv(key)
+
+openai_key = get_secret("OPENAI_API_KEY")
+
+llm = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key)
 
 sample_literature = [
     "BRCA1 mutations are associated with increased sensitivity to PARP inhibitors such as Olaparib. Clinical trials show 72% response rate in BRCA1 mutated breast cancer patients.",
@@ -24,10 +33,9 @@ def build_vectorstore():
     docs = [Document(page_content=text) for text in sample_literature]
     splitter = RecursiveCharacterTextSplitter(chunk_size=200, chunk_overlap=20)
     chunks = splitter.split_documents(docs)
-
     vectorstore = Chroma.from_documents(
         documents=chunks,
-        embedding=OpenAIEmbeddings(api_key=os.getenv("OPENAI_API_KEY")),
+        embedding=OpenAIEmbeddings(api_key=openai_key),
         persist_directory=CHROMA_DIR
     )
     return vectorstore
@@ -36,34 +44,27 @@ def get_vectorstore():
     if not os.path.exists(CHROMA_DIR) or not os.listdir(CHROMA_DIR):
         print("Building vectorstore for first time...")
         return build_vectorstore()
-
     return Chroma(
         persist_directory=CHROMA_DIR,
-        embedding_function=OpenAIEmbeddings(api_key=os.getenv("OPENAI_API_KEY"))
+        embedding_function=OpenAIEmbeddings(api_key=openai_key)
     )
 
 def run(state):
     print("Agent 3 running — retrieving literature evidence...")
-
     mutations = state["mutations"]
     drugs = [r["drug"] for r in state["graph_results"]]
     query = f"treatment evidence for mutations {mutations} and drugs {drugs}"
-
     vectorstore = get_vectorstore()
     docs = vectorstore.similarity_search(query, k=3)
-
     if not docs:
         print("No documents found. Rebuilding vectorstore...")
         vectorstore = build_vectorstore()
         docs = vectorstore.similarity_search(query, k=3)
-
     evidence = "\n".join([d.page_content for d in docs])
-
     state["rag_evidence"] = evidence
     print(f"Evidence retrieved: {len(docs)} documents")
     if evidence:
         print(evidence[:200] + "...")
     else:
         print("No evidence text retrieved.")
-
     return state
