@@ -1,9 +1,6 @@
-def run(state):
-    import streamlit as st
-    key = get_secret("OPENAI_API_KEY")
-    st.write(f"KEY LEN: {len(key) if key else 'NONE'}, PREFIX: {key[:15] if key else 'NONE'}")
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_openai import ChatOpenAI
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 import os
@@ -20,6 +17,9 @@ def get_secret(key):
 openai_key = get_secret("OPENAI_API_KEY")
 llm = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key)
 
+# Free local embeddings - no API key needed
+embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
 sample_literature = [
     "BRCA1 mutations are associated with increased sensitivity to PARP inhibitors such as Olaparib. Clinical trials show 72% response rate in BRCA1 mutated breast cancer patients.",
     "TP53 mutations correlate with immunotherapy response. Pembrolizumab shows moderate efficacy in TP53 mutated tumors with 45% response rate in clinical studies.",
@@ -29,27 +29,19 @@ sample_literature = [
     "Combination of PARP inhibitors with immunotherapy shows promising results in BRCA mutated cancers with improved overall survival rates.",
 ]
 
-# ── No persist_directory — builds in memory every run ─────────
 def build_vectorstore():
     docs = [Document(page_content=text) for text in sample_literature]
     splitter = RecursiveCharacterTextSplitter(chunk_size=200, chunk_overlap=20)
     chunks = splitter.split_documents(docs)
-    vectorstore = Chroma.from_documents(
-        documents=chunks,
-        embedding=OpenAIEmbeddings(api_key=openai_key)
-        # No persist_directory
-    )
-    return vectorstore
+    return Chroma.from_documents(documents=chunks, embedding=embeddings)
 
 def run(state):
     print("Agent 3 running — retrieving literature evidence...")
     mutations = state["mutations"]
     drugs = [r["drug"] for r in state["graph_results"]]
     query = f"treatment evidence for mutations {mutations} and drugs {drugs}"
-    
-    vectorstore = build_vectorstore()  # always build fresh
+    vectorstore = build_vectorstore()
     docs = vectorstore.similarity_search(query, k=3)
-    
     evidence = "\n".join([d.page_content for d in docs])
     state["rag_evidence"] = evidence
     print(f"Evidence retrieved: {len(docs)} documents")
