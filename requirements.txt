@@ -1,7 +1,12 @@
 streamlit
 openai
 neo4j
-chromadb
+chromadb==0.4.24
+langchain
+langchain-openai
+langchain-chroma==0.1.4
+langchain-community
+langgraph
 xgboost
 scikit-learn
 pandas
@@ -12,9 +17,8 @@ pydantic
 cryptography
 presidio-analyzer
 presidio-anonymizer
-langgraph
-langchain
-langchain-openai
-langchain-community
 sentence-transformers
-langchain-chroma
+protobuf<4.0.0
+opentelemetry-api<1.25.0
+opentelemetry-sdk<1.25.0
+opentelemetry-exporter-otlp-proto-grpc<1.25.0
