@@ -10,7 +10,7 @@ class ActionController:
     def __init__(self, log_file=None):
         """Initialize action controller with audit logging"""
         if log_file is None:
-            log_file = '/home/deepekagurunathan/molecular-intel-agent/logs/action_audit.log'
+            log_file = "logs/audit.log"
         
         # Ensure log directory exists
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
