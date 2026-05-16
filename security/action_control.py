@@ -32,6 +32,7 @@ class ActionController:
             'extract_features': {'allowed': True, 'risk_level': 'MEDIUM'},
             'generate_recommendations': {'allowed': True, 'risk_level': 'HIGH'},
             'llm_call': {'allowed': True, 'risk_level': 'HIGH'},
+            'call_llm': {'allowed': True, 'risk_level': 'HIGH'},  
             'database_write': {'allowed': False, 'risk_level': 'CRITICAL'},
             'export_patient_data': {'allowed': False, 'risk_level': 'CRITICAL'},
         }
