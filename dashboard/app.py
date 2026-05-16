@@ -419,8 +419,14 @@ if st.session_state.get("consent_given") and st.session_state.get("validated_inp
         state = run4(state)
         progress.progress(80)
     with st.spinner("✍️ Agent 5 — Generating clinical rationale..."):
-        state = run5(state)
-        progress.progress(100)
+        try:
+            state = run5(state)
+        except Exception as e:
+            st.error(f"❌ Agent 5 failed: {type(e).__name__}")
+            st.error(f"Details: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc(), language="python")
+            st.stop()
 
     st.session_state['state'] = state
     st.session_state['form'] = {
