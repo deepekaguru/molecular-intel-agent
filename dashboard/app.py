@@ -295,7 +295,7 @@ if st.sidebar.button("🔬 Run Analysis"):
     }
     st.session_state["show_consent"] = True
 
-# ===== CONSENT SECTION (persists across reruns via session_state) =====
+# ===== CONSENT SECTION =====
 if st.session_state.get("show_consent") and not st.session_state.get("consent_given"):
     st.markdown("---")
     st.warning("⚠️ **Research Tool Only** - All recommendations require clinical verification before patient care")
@@ -337,7 +337,7 @@ if st.session_state.get("show_consent") and not st.session_state.get("consent_gi
     else:
         st.info("👆 Please confirm your understanding before proceeding")
 
-# ===== RUN PIPELINE (after consent given) =====
+# ===== RUN PIPELINE =====
 if st.session_state.get("consent_given") and st.session_state.get("validated_inputs"):
     inputs = st.session_state["validated_inputs"]
     patient_id        = inputs["patient_id"]
@@ -435,7 +435,6 @@ if st.session_state.get("consent_given") and st.session_state.get("validated_inp
         "cancer_type": cancer_type,
         "prior_treatment": prior_treatment
     }
-    # Clear pipeline flags so it doesn't re-run on next rerun
     st.session_state["consent_given"] = False
     st.session_state["show_consent"] = False
     st.session_state["validated_inputs"] = None
@@ -447,6 +446,7 @@ if 'state' in st.session_state:
     state = st.session_state['state']
     form = st.session_state.get('form', {})
 
+    # ── 4 Metric Cards ──
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("🧬 Mutations", len(state['mutations']))
     c2.metric("🕸️ Graph matches", len(state['graph_results']))
@@ -455,11 +455,38 @@ if 'state' in st.session_state:
         f"{round(float(state['ranked_treatments'][0]['ml_score']) * 100, 1)}%"
         if state['ranked_treatments'] else "—")
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    # ── Treatment Comparison Chart (full width, right after metrics) ──
+    if state['ranked_treatments']:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<div class='section-header'>Treatment Comparison</div>", unsafe_allow_html=True)
+        fig = go.Figure()
+        fig.add_trace(go.Bar(name='ML Confidence %',
+            x=[t['drug'] for t in state['ranked_treatments']],
+            y=[round(t['ml_score']*100,1) for t in state['ranked_treatments']],
+            marker_color='#9d5cf6', marker_line_color='#c4b0f0', marker_line_width=1))
+        fig.add_trace(go.Bar(name='Response Rate %',
+            x=[t['drug'] for t in state['ranked_treatments']],
+            y=[round(t['response_rate']*100,1) for t in state['ranked_treatments']],
+            marker_color='#c084fc', marker_line_color='#ddd0ff', marker_line_width=1))
+        fig.update_layout(
+            barmode='group',
+            paper_bgcolor='rgba(255,255,255,0)',
+            plot_bgcolor='rgba(245,240,255,0.6)',
+            font=dict(color='#3a2a5c', size=12),
+            legend=dict(bgcolor='rgba(255,255,255,0.8)', bordercolor='rgba(147,112,219,0.3)', borderwidth=1),
+            xaxis=dict(gridcolor='rgba(147,112,219,0.15)', linecolor='rgba(147,112,219,0.2)'),
+            yaxis=dict(gridcolor='rgba(147,112,219,0.15)', linecolor='rgba(147,112,219,0.2)', range=[0,105]),
+            margin=dict(l=0,r=0,t=10,b=0), height=280
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
     st.divider()
+
+    # ── Two Column Layout ──
     col_left, col_right = st.columns([3, 2])
 
     with col_left:
+        # Ranked Treatment Cards
         st.markdown("<div class='section-header'>Ranked Treatment Recommendations</div>", unsafe_allow_html=True)
         colors = ["#7c3aed", "#9d5cf6", "#c084fc"]
         for i, t in enumerate(state['ranked_treatments']):
@@ -487,30 +514,8 @@ if 'state' in st.session_state:
                 </div>
             </div>""", unsafe_allow_html=True)
 
+        # Clinical Rationale
         st.markdown("<br>", unsafe_allow_html=True)
-        if state['ranked_treatments']:
-            st.markdown("<div class='section-header'>Treatment Comparison</div>", unsafe_allow_html=True)
-            fig = go.Figure()
-            fig.add_trace(go.Bar(name='ML Confidence %',
-                x=[t['drug'] for t in state['ranked_treatments']],
-                y=[round(t['ml_score']*100,1) for t in state['ranked_treatments']],
-                marker_color='#9d5cf6', marker_line_color='#c4b0f0', marker_line_width=1))
-            fig.add_trace(go.Bar(name='Response Rate %',
-                x=[t['drug'] for t in state['ranked_treatments']],
-                y=[round(t['response_rate']*100,1) for t in state['ranked_treatments']],
-                marker_color='#c084fc', marker_line_color='#ddd0ff', marker_line_width=1))
-            fig.update_layout(
-                barmode='group',
-                paper_bgcolor='rgba(255,255,255,0)',
-                plot_bgcolor='rgba(245,240,255,0.6)',
-                font=dict(color='#3a2a5c', size=12),
-                legend=dict(bgcolor='rgba(255,255,255,0.8)', bordercolor='rgba(147,112,219,0.3)', borderwidth=1),
-                xaxis=dict(gridcolor='rgba(147,112,219,0.15)', linecolor='rgba(147,112,219,0.2)'),
-                yaxis=dict(gridcolor='rgba(147,112,219,0.15)', linecolor='rgba(147,112,219,0.2)', range=[0,105]),
-                margin=dict(l=0,r=0,t=10,b=0), height=260
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
         st.markdown("<div class='section-header'>Clinical Rationale</div>", unsafe_allow_html=True)
         st.markdown(f"""
         <div style='background:rgba(255,255,255,0.85); border:1px solid rgba(147,112,219,0.25);
@@ -518,6 +523,7 @@ if 'state' in st.session_state:
         {state['rationale'].replace(chr(10), '<br>')}
         </div>""", unsafe_allow_html=True)
 
+        # Supporting Literature
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("<div class='section-header'>Supporting Literature</div>", unsafe_allow_html=True)
         st.markdown(f"""
@@ -528,6 +534,7 @@ if 'state' in st.session_state:
         </div>""", unsafe_allow_html=True)
 
     with col_right:
+        # Patient Summary
         st.markdown("<div class='section-header'>Patient Summary</div>", unsafe_allow_html=True)
         mutations_html = "".join([f"<span class='gene-badge'>{m}</span>" for m in state['mutations']])
         cnv_html = "".join([f"<span class='gene-badge' style='border-color:rgba(251,146,60,0.4);color:#ea580c;background:rgba(251,146,60,0.1);'>{c}</span>" for c in state['cnvs']])
@@ -558,6 +565,7 @@ if 'state' in st.session_state:
             <div>{cnv_html if cnv_html else '<span style="color:#c4b0f0">None detected</span>'}</div>
         </div>""", unsafe_allow_html=True)
 
+        # Knowledge Graph Matches
         if state['graph_results']:
             st.markdown("<div class='section-header'>Knowledge Graph Matches</div>", unsafe_allow_html=True)
             for r in state['graph_results']:
@@ -573,6 +581,7 @@ if 'state' in st.session_state:
                     <div style='color:#059669; font-weight:600;'>{round(r['response_rate']*100)}%</div>
                 </div>""", unsafe_allow_html=True)
 
+        # Oncologist Review
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("<div class='section-header'>Oncologist Review</div>", unsafe_allow_html=True)
 
